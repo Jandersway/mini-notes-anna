@@ -1,0 +1,39 @@
+{
+  "name": "mini-notes-anna",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "build:tool": "node scripts/build-tool.mjs",
+    "validate": "node scripts/check-contract.mjs && anna-app validate --strict",
+    "dev": "npm run build && npm run build:tool && anna-app dev --no-llm",
+    "dev:ui": "anna-app dev --no-llm",
+    "test": "tsx --test tests/*.test.ts",
+    "test:protocol": "npm run build:tool && node scripts/test-protocol.mjs",
+    "test:sampling": "npm run build:tool && node scripts/test-sampling.mjs",
+    "test:ui": "npm run build && npm run build:tool && node scripts/test-ui.mjs",
+    "package:executa": "node scripts/package-executa.mjs",
+    "verify:archive": "node scripts/verify-archive.mjs",
+    "check": "npm run build && npm run validate && npm test && npm run test:protocol && npm run test:sampling"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@anna-ai/cli": "0.1.61",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "fflate": "0.8.3",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}

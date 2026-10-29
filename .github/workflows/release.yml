@@ -1,0 +1,92 @@
+name: Build and release Executa
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag to build (for example v0.1.0)"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: darwin-arm64
+          - runner: macos-15-intel
+            platform: darwin-x86_64
+          - runner: windows-2025
+            platform: windows-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.3"
+          cache: false
+      - run: npm ci
+      - name: Check release version
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: node scripts/check-release.mjs
+      - run: npm run check
+      - run: npm run package:executa -- --platform ${{ matrix.platform }}
+      - run: npm run verify:archive -- --platform ${{ matrix.platform }} --require-native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: dist
+      - name: Verify all three assets and collect checksums
+        run: node scripts/collect-release.mjs
+      - name: Publish GitHub Release assets
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const tag = process.env.RELEASE_TAG;
+            let release;
+            try { release = (await github.rest.repos.getReleaseByTag({ ...context.repo, tag })).data; }
+            catch (e) {
+              if (e.status !== 404) throw e;
+              release = (await github.rest.repos.createRelease({ ...context.repo, tag_name: tag, name: `Mini Notes ${tag}`, draft: true, body: 'Native Executa binaries. See README for local Anna harness and sampling tests.' })).data;
+            }
+            // Upload into a draft, then publish only after every asset is present.
+            if (!release.draft) throw new Error('This release is already published; use a new version instead of overwriting assets.');
+            const existing = (await github.rest.repos.listReleaseAssets({ ...context.repo, release_id: release.id })).data;
+            for (const name of fs.readdirSync('dist').filter(n => /\.(zip|tar\.gz)$/.test(n) || n === 'SHA256SUMS.txt')) {
+              const previous = existing.find(asset => asset.name === name);
+              if (previous) await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: previous.id });
+              await github.rest.repos.uploadReleaseAsset({ ...context.repo, release_id: release.id, name, data: fs.readFileSync(`dist/${name}`) });
+            }
+            await github.rest.repos.updateRelease({ ...context.repo, release_id: release.id, draft: false });

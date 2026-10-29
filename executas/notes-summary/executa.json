@@ -1,0 +1,10 @@
+{
+  "slug": "notes-summary",
+  "name": "Mini Notes Summary",
+  "version": "0.1.0",
+  "executa_type": "tool",
+  "tool_id": "tool-local-notes-summary-12345678",
+  "type": "binary",
+  "enabled": true,
+  "command": ["node", "../../scripts/run-tool.mjs"]
+}

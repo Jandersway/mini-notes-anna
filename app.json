@@ -1,0 +1,8 @@
+{
+  "slug": "mini-notes-anna",
+  "name": "Mini Notes",
+  "version": "0.1.0",
+  "tagline": "Capture a thought. Find the essentials.",
+  "description": "A local Anna App with Host API notes storage and an Executa sampling summarizer.",
+  "category": "productivity"
+}

@@ -1,0 +1,9 @@
+node_modules/
+bundle/
+dist/
+executas/notes-summary/bin/
+.anna/
+.cache/
+.env*
+*.log
+test-results/
