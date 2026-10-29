@@ -1,0 +1,2 @@
+{"event":"sampling.request","invoke_id":"local:2","sampling_id":"sampling:1"}
+{"event":"sampling.response","invoke_id":"local:2","sampling_id":"sampling:1"}

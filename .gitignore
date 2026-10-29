@@ -6,4 +6,5 @@ executas/notes-summary/bin/
 .cache/
 .env*
 *.log
+!docs/evidence/*.log
 test-results/
