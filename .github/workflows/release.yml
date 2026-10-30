@@ -14,7 +14,13 @@ concurrency:
   group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ github.event.inputs.tag || github.ref }}
   build:
+    needs: verify
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -51,8 +57,16 @@ jobs:
           name: binary-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
+      - name: Keep native protocol evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-verification-${{ matrix.platform }}
+          path: test-results/
+          if-no-files-found: warn
   release:
     needs: build
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:
       contents: write

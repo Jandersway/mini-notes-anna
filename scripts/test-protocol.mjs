@@ -146,7 +146,10 @@ try {
     `Unexpected/non-JSON output: ${JSON.stringify(frames)}`,
   );
   assert.match(stderr, /sampling.request/);
-  const evidence = resolve(root, "test-results");
+  const evidence = resolve(
+    root,
+    process.env.PROTOCOL_EVIDENCE_DIR || "test-results",
+  );
   mkdirSync(evidence, { recursive: true });
   writeFileSync(
     resolve(evidence, "protocol.jsonl"),

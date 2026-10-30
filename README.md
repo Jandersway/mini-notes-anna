@@ -6,6 +6,8 @@
 
 界面设计与本次验证范围见 [UI 可用性检查](docs/UI-REVIEW.md)。`docs/evidence/` 保留 v0.1.0 发布时的验收快照。
 
+CI、故障测试与最终 archive 验证的升级说明见 [自动化验收升级](docs/AUTOMATION-UPGRADE.md)。
+
 ## 快速开始
 
 需要 Node.js 22+、npm、Go 1.23+、[uv](https://docs.astral.sh/uv/getting-started/installation/)。本项目验证使用 Node 24.15.0 / Go 1.27.3 / Anna CLI 0.1.61；npm 依赖固定在 package-lock.json。
@@ -22,10 +24,10 @@ npm run dev:ui
 
 这些命令使用 `anna-app dev --no-llm` 和默认的 legacy in-memory runtime_state，不需要 Anna 登录、真实 LLM key 或数据库。请从 Anna dashboard 打开的 iframe 操作；单独打开 bundle/index.html 不具备宿主环境。
 
-**第一次运行可能需要先缓存 runtime。** CLI 的 Python bridge 启动限时为 8 秒；首次下载超时可执行下面的命令，完成后再启动：
+**首次启动会自动预热 runtime。** `npm run dev`、`dev:ui` 和 `test:ui` 都先运行 `prepare:harness`，从已安装 CLI 中读取唯一的 runtime pin，再准备同一官方 Python 环境，避免首次下载耗尽 bridge 的 8 秒握手时间。首次准备需要网络，之后可复用缓存。也可单独执行：
 
 ```sh
-uvx --from anna-app-runtime-local==0.2.0a30 python -c "import anna_app_runtime_local; print('Anna runtime ready')"
+npm run prepare:harness
 ```
 
 ## 使用与验收
@@ -152,13 +154,21 @@ npm run check
 ```sh
 npx playwright install chromium
 npm run test:ui
+# 包含上述 UI 验收的完整检查（CI 与发布前门禁使用同一个命令）
+npm run check:all
 ```
 
-它启动真正的 Anna harness，在 iframe 内创建三条笔记、删除第二条、刷新读取、只刷新 iframe、点击 Summarize，验证预期的禁用 LLM 错误。它不会注入 mock summary。
+它启动真正的 Anna harness，在独立会话中验证三组场景：
+
+1. 创建、删除确认/取消、刷新、iframe 重新挂载、真实 tools.invoke、预期的禁用 LLM 错误，以及默认窗口/窄屏布局；不拉高 iframe 隐藏溢出。
+2. 仅拦截 storage.set 注入失败，验证草稿和已保存笔记保留、删除失败后数据不丢失、解除故障后重试成功。成功的 storage 操作始终调用真实 Host API。
+3. 笔记及错误详情中的 HTML/script 字符串只呈现为文本；全部场景均断言前端没有调用 llm namespace。
+
+UI harness 不注入成功的总结或存储 mock。后端 sampling 成功仍由官方 standalone fixture 路径独立验证。Linux CI 使用 `npx playwright install --with-deps chromium` 安装浏览器及系统依赖。
 
 已有 Chrome 时，可在 PowerShell 7 设置 `$env:BROWSER_CHANNEL = 'chrome'` 后运行；也支持 `HARNESS_URL` 指向已启动的本地 harness。默认测试端口为 5189。
 
-查看 `test-results/ui-rpc.jsonl` 中 `ns:storage, method:get/set` 和 `ns:tools, method:invoke`。该文件只保存验收笔记与相关调用结果，不保存 session token。也可以使用 Anna dashboard 的 RPC 日志或 Record 功能观察同样链路。
+查看 `test-results/ui-rpc.jsonl` 中的 `scenario`、`ns:storage, method:get/set` 和 `ns:tools, method:invoke`。该文件只保存合成验收数据与相关调用结果，不保存 session token。`storage-failure` 和 `safe-text` 场景中的失败响应由测试明确注入。失败时另保存 `ui-failure.txt` 和可用的 iframe 截图。也可以使用 Anna dashboard 的 RPC 日志或 Record 功能观察真实链路。
 
 测试范围包含空输入、稳定序号、并发写入队列、存储写失败后恢复、失败删除不改变已保存数据、损坏数据保护、summary 结果与错误透传。只验证本地单窗口模型，未实现跨窗口冲突合并。
 
@@ -199,9 +209,11 @@ bin/notes-summary       # macOS：tar 内模式 0755
 # 或 bin/notes-summary.exe（Windows）
 ```
 
-根 manifest 包含 name/version/tools/host_capabilities/runtime.binary.entrypoint/permissions。验证脚本核对 SHA-256、二进制架构、archive 结构与 entrypoint；在相同平台解包并真实执行 describe。不同平台只检查结构与二进制头，不冒称完成了原生运行测试。
+根 manifest 包含 name/version/tools/host_capabilities/runtime.binary.entrypoint/permissions。验证脚本核对 SHA-256、二进制架构、archive 结构与 entrypoint；在相同平台解包，执行 describe，并对该解压文件运行完整双向协议测试，覆盖采样、并发、错误、超时、EOF 和 stdout 纯净性。证据独立保存在 `test-results/archive-<platform>/`，不会覆盖源码构建的测试记录。不同平台只检查结构与二进制头，不冒称完成了原生运行测试。
 
 ## GitHub Actions 发布
+
+日常 `.github/workflows/ci.yml` 在分支 push / PR 时调用 `verify.yml`，执行 `npm run check:all`。发布流程也先调用同一份可复用 workflow；验收失败就不会进入三平台构建。成功和失败的测试证据都会作为 Actions artifacts 保留。
 
 `.github/workflows/release.yml` 支持：
 
@@ -210,7 +222,7 @@ bin/notes-summary       # macOS：tar 内模式 0755
 
 tag 必须匹配 package.json 与 Tool manifest 版本。手动触发同样 checkout 指定 tag，避免发布不同提交。
 
-workflow 使用 macos-15（ARM64）、macos-15-intel（x86_64）、windows-2025（x86_64）分别执行检查、构建、打包、原生解包 smoke test。三个 job 全成功后，汇总 SHA256SUMS 并上传到同一个 GitHub Release；所有文件上传完毕才公开 Release。中间 Actions artifacts 只是传输介质，不是最终交付。
+验收通过后，workflow 使用 macos-15（ARM64）、macos-15-intel（x86_64）、windows-2025（x86_64）分别执行检查、构建、打包，以及解包后完整协议验收。三个 job 全成功后，汇总 SHA256SUMS 并上传到同一个 GitHub Release；所有文件上传完毕才公开 Release。中间 Actions artifacts 只是传输介质，不是最终交付。
 
 发布资产必须包含三个平台 archive 和 SHA256SUMS.txt。使用内置 GITHUB_TOKEN，Release job 声明 contents: write，不需要在项目中配置个人 PAT。已公开的 Release 不被覆盖；发布新版本请更新版本号及 tag。
 

@@ -73,8 +73,21 @@ if (native) {
     timeout: 10000,
   });
   assert.deepEqual(JSON.parse(output.stdout).result, toolManifest);
+  // Run the complete bidirectional protocol suite against the bytes extracted
+  // from the shipping archive. Keep this evidence separate from source builds.
+  run(
+    process.execPath,
+    [resolve(root, "scripts/test-protocol.mjs"), resolve(target, entrypoint)],
+    {
+      env: {
+        ...process.env,
+        PROTOCOL_EVIDENCE_DIR: `test-results/archive-${platform}`,
+      },
+      timeout: 30000,
+    },
+  );
   console.log(
-    `PASS: ${platform} archive, manifest, checksum, architecture and extracted binary describe.`,
+    `PASS: ${platform} archive, manifest, checksum, architecture, extracted binary describe and full protocol suite.`,
   );
 } else
   console.log(
