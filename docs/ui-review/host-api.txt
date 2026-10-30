@@ -1,0 +1,28 @@
+01:32:56.695→ req storage.get {"key":"mini-notes:v1"}
+01:32:56.697← res ok storage.get {"value":null}
+01:34:36.881→ req storage.get {"key":"mini-notes:v1"}
+01:34:36.883← res ok storage.get {"value":null}
+01:34:52.025→ req storage.get {"key":"mini-notes:v1"}
+01:34:52.028← res ok storage.get {"value":null}
+01:34:52.029→ req storage.set {"key":"mini-notes:v1","value":{"schemaVersion":1,"nextOrder":2,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1}]}}
+01:34:52.032← res ok storage.set {"ok":true}
+01:34:52.326→ req storage.get {"key":"mini-notes:v1"}
+01:34:52.329← res ok storage.get {"value":{"schemaVersion":1,"nextOrder":2,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1}]}}
+01:34:52.329→ req storage.set {"key":"mini-notes:v1","value":{"schemaVersion":1,"nextOrder":3,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"48a388ea-48df-450a-9d63-bc6112ce84da","content":"修复登录 bug","order":2}]}}
+01:34:52.331← res ok storage.set {"ok":true}
+01:34:52.626→ req storage.get {"key":"mini-notes:v1"}
+01:34:52.629← res ok storage.get {"value":{"schemaVersion":1,"nextOrder":3,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"48a388ea-48df-450a-9d63-bc6112ce84da","content":"修复登录 bug","order":2}]}}
+01:34:52.629→ req storage.set {"key":"mini-notes:v1","value":{"schemaVersion":1,"nextOrder":4,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"48a388ea-48df-450a-9d63-bc6112ce84da","content":"修复登录 bug","order":2},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:34:52.631← res ok storage.set {"ok":true}
+01:35:04.592→ req storage.get {"key":"mini-notes:v1"}
+01:35:04.596← res ok storage.get {"value":{"schemaVersion":1,"nextOrder":4,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"48a388ea-48df-450a-9d63-bc6112ce84da","content":"修复登录 bug","order":2},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:35:04.596→ req storage.set {"key":"mini-notes:v1","value":{"schemaVersion":1,"nextOrder":4,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:35:04.598← res ok storage.set {"ok":true}
+01:35:04.892→ req storage.get {"key":"mini-notes:v1"}
+01:35:04.895← res ok storage.get {"value":{"schemaVersion":1,"nextOrder":4,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:35:05.190→ req storage.get {"key":"mini-notes:v1"}
+01:35:05.193← res ok storage.get {"value":{"schemaVersion":1,"nextOrder":4,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:35:38.042→ req storage.get {"key":"mini-notes:v1"}
+01:35:38.045← res ok storage.get {"value":{"schemaVersion":1,"nextOrder":4,"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:35:38.046→ req tools.invoke {"tool_id":"tool-local-notes-summary-12345678","method":"summarize","args":{"notes":[{"id":"7c204669-baca-4ee5-86d4-cb9003e2f4f2","content":"明天跟客户 follow up","order":1},{"id":"eca19cb1-7cbc-48f7-ba99-f07cf405e273","content":"Workshop 内容想法","order":3}]}}
+01:35:38.059← res err tool_failed [-32603] harness started with --no-llm

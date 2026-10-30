@@ -1,47 +1,58 @@
-# Mini Notes 界面可用性检查
+# Mini Notes 最终界面与原题验收
 
-日期：2026-10-30。对应本地分支 `ui/usability-review`；本次未发布新的 GitHub Release。
+日期：2026-10-30。工作分支：`ui/usability-review`。
 
-## 参考与取舍
+## 最终界面
 
-- [Simplenote](https://simplenote.com/)：借鉴其“表面简单”的设计原则，把记录与阅读作为主要任务。Mini Notes 按题目要求保留显式保存，没有增加标签、搜索或自动同步。
-- [Bear](https://bear.app/)：借鉴清晰的内容分区与克制的视觉层级；不照搬三栏导航、富文本等复杂功能。
+界面保持单列：输入区 → 总结辅助栏 → 笔记列表。桌面最大内容宽度 840px，窄屏自然缩放。总结无结果时只显示简短说明和操作按钮，有结果、等待或错误时才展开内容。
 
-原界面的主要问题：大标题和英文装饰挤占输入空间，辅助文字和删除按钮偏小，总结错误出现在全页顶部，删除缺少确认，窄屏总结在整个笔记列表之后。
+修正了初版的明显问题：大面积装饰和空白、过重的右侧总结卡片、空页面内层滚动、空列表仍显示“笔记已读取”。保留清晰的文字、44px 操作按钮、删除确认、键盘焦点、Ctrl / Cmd + Enter 保存和草稿保护。
 
-## 已调整
+官方 Anna harness 的地址栏、日志、录制按钮属于开发工具，不是应用的功能。它们保留用于题目验收。没有修改官方依赖、隐藏调用证据或用普通 Web 页面替代 Anna iframe。
 
-- 紧凑页头；桌面左侧输入与列表，右侧总结。窄屏按输入、总结、列表排列，让总结入口可发现。
-- 正文 15px，主要辅助文字 12–13px；可操作按钮高度至少 44px；保留清晰键盘焦点。
-- 空白输入不可保存；支持 Ctrl / Cmd + Enter，中文输入法组合期间不触发；保存完成后清空输入并恢复焦点。
-- 删除使用就地确认，默认聚焦取消；支持 Esc 取消，成功后焦点回到列表标题。
-- 保存、读取、删除反馈与总结反馈分开；原始技术错误收进“查看详情”。
-- 总结只使用已保存笔记；生成过程中可继续输入草稿。笔记改变后清除旧总结并提示重新生成。
-- 无模型提示解释当前可做的操作，失败后隐藏不适用的总结占位提示。
-- 本地预览提供折叠的会话存储说明，避免把临时调试会话误解成永久保存。
-- manifest 声明 desktop / mobile，以便官方 harness 切换响应式预览。
+参考：[Simplenote](https://simplenote.com/) 的简单操作与 [Bear](https://bear.app/) 的内容层级；仅借鉴简洁原则，没有增加题目不要求的富文本、标签、搜索等功能。
 
-## 本次验证
+## 原始 question.md 对照
 
-通过 `npm run build`、`npm run validate`、`npm test`（5 项）、`git diff --check`。
+| 原题要求                                      | 实现与证据                                                          | 本次结果                                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 工程化前端、静态 bundle                       | React / TypeScript / Vite，UI、runtime、storage、tools 分层         | `npm run build` 通过                                                                                  |
+| manifest 声明及 tool identity 一致            | `manifest.json`、Executa manifest、调用常量、describe               | `npm run validate`，包含 strict 校验，通过                                                            |
+| 创建、查看、删除笔记；内容与添加顺序          | `src/App.tsx`、`src/notes/model.ts`                                 | 浏览器创建三条、取消删除、确认删除第二条、刷新读回通过                                                |
+| 空输入禁存；保存后清空输入                    | 表单约束、输入处理                                                  | 空白字符不可保存；保存后输入清空并恢复焦点；快捷键通过                                                |
+| Anna storage get / set                        | `src/anna/storage.ts`；[本次 Host API 记录](ui-review/host-api.txt) | 创建和删除均产生真实 get / set；重新挂载 iframe 后读回 1、3 两条笔记                                  |
+| 默认无登录 legacy runtime_state               | 原生 `anna-app dev --no-llm`                                        | 在独立 session 验证；不承诺刷新外层 dashboard 后仍保留                                                |
+| Summarize 调用本地 Executa                    | `src/anna/tools.ts`，通过 `anna.tools.invoke`                       | 真实 tools.invoke 参数只含已保存笔记；草稿未发送                                                      |
+| `--no-llm` 预期错误                           | 总结区展开“查看详情”                                                | 返回 `[-32603] harness started with --no-llm`；笔记和草稿保留                                         |
+| Tool 反向 sampling RPC                        | Go Executa；`scripts/test-protocol.mjs`                             | v2 协商、describe、reverse RPC、并发关联、错误、超时、EOF、stdout 纯净性通过                          |
+| 官方 mock sampling 单独验证                   | `scripts/test-sampling.mjs`、fixtures                               | `anna-app executa dev --mock-sampling` 通过，记录 sampling.request / response                         |
+| 三平台原生二进制 archive                      | `scripts/package-executa.mjs`、`scripts/verify-archive.mjs`         | 三个平台均打包并通过 manifest、结构、架构、权限、校验和验证；Windows 解包后实际执行 describe 通过     |
+| GitHub Release workflow                       | `.github/workflows/release.yml`                                     | 已审阅：三平台 matrix、check、打包、原生 smoke、Release assets 上传均存在；本次没有新建或覆盖 Release |
+| README 安装、构建、调试、协议、打包、证据说明 | `README.md`                                                         | 已同步最终 UI 与本次验收说明                                                                          |
 
-在真实 Anna harness 的独立会话中，通过浏览器实际验证：
+此前 v0.1.0 的三平台发布结果保留在 [GitHub Release](https://github.com/Jandersway/mini-notes-anna/releases/tag/v0.1.0)；本次没有修改 Executa 源码、协议或发布 workflow。本机无法执行 macOS 二进制，macOS 原生运行验证由对应 CI runner 完成。
 
-1. 空输入和纯空格不能保存；保存后清空输入并恢复焦点。
-2. Ctrl + Enter 保存；删除弹出确认且焦点在取消；Esc 取消后数据不变。
-3. 确认删除后，重新读取仍然正确；新笔记不复用已删除的序号。
-4. `--no-llm` 错误只显示在总结区，输入草稿保留，笔记仍显示；错误后不再显示“点击按钮查看重点”。
-5. 900px 桌面与 harness 390px 窄屏布局；窄屏内容宽度与滚动宽度均为 375px（另含滚动条），没有横向溢出，按钮高度均为 44px。
-6. harness 切换屏幕形态后，当前会话笔记仍能读回。
+## 本次执行过的检查
 
-`scripts/test-ui.mjs` 已同步新控件名称、删除确认与草稿保留断言；本次 UI 验证使用交互浏览器，未重新运行该自动化脚本。后端协议和 sampling 逻辑未修改，沿用 v0.1.0 的验收记录。
+- `npm run check`：前端构建、严格校验、5 项基础测试、协议测试、官方 mock sampling 均通过。
+- `npm run package:executa` 与 `npm run verify:archive -- --require-native`：Windows 通过。
+- `npm run package:executa -- --platform darwin-arm64` 和对应 verify：通过。
+- `npm run package:executa -- --platform darwin-x86_64` 和对应 verify：通过。
+- `git diff --check`：通过。
+- 实际浏览器检查：桌面 / 窄屏空状态、空白输入、创建、快捷键、焦点、删除取消 / 确认、重新读取、iframe 重新挂载、tools.invoke 错误、草稿保护、长连续文本换行。
 
-范围限制：未进行真人可用性研究或完整无障碍审计；本次未接入真实 LLM。窄屏是浏览器模拟，未在实体手机中验收。不能据此承诺所有使用情境都完全合理。
+几何检查使用官方默认窗口，未人为拉高 iframe 掩盖滚动：桌面内容宽度 900px，滚动宽度 900px，空状态及两条短笔记时高度均为 694px，无额外滚动；窄屏空状态宽度 390px、高度 818px，无横向或纵向溢出；长文本下内容宽度与滚动宽度均为 375px（另有纵向滚动条）。内容多时保留正常纵向滚动。
 
-## 预览
+`test:ui` 的可复现脚本也已更新：增加空状态不溢出断言，改用官方 Mobile 切换，不再修改 iframe 高度制造截图。本轮使用交互浏览器完成 UI 验证，未重新执行该 Playwright 脚本。
 
-截图使用独立会话中的示例笔记。
+本次未接入真实 LLM、真实云端 APS 或 Anna 账号，符合原题“不要求”的范围；不把 fixture 结果伪装成真实模型输出。没有进行真人可用性研究或实体手机验收。
 
-![桌面预览](ui-review/desktop.jpg)
+## 最新截图
 
-![窄屏预览](ui-review/mobile.jpg)
+截图仅包含独立测试 session 的示例笔记。
+
+![空状态](ui-review/empty.jpg)
+
+![桌面](ui-review/desktop.jpg)
+
+![窄屏](ui-review/mobile.jpg)

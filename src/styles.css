@@ -5,10 +5,13 @@
   background: #f7f8f3;
   font-synthesis: none;
   font-weight: 400;
-  line-height: 1.65;
+  line-height: 1.6;
 }
 * {
   box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
 }
 body {
   margin: 0;
@@ -21,9 +24,9 @@ button {
   min-height: 44px;
   border: 0;
   cursor: pointer;
-  border-radius: 9px;
+  border-radius: 8px;
   padding: 10px 16px;
-  color: white;
+  color: #fff;
   background: #294f41;
   font-weight: 600;
   font-size: 14px;
@@ -43,57 +46,55 @@ h2:focus-visible {
   outline-offset: 3px;
 }
 .app-shell {
-  max-width: 1120px;
+  max-width: 840px;
   margin: auto;
-  padding: 24px 28px;
+  padding: 20px 24px;
 }
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 22px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #dbe2d4;
+  margin-bottom: 20px;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .brand-mark {
   font-family: Georgia, serif;
-  font-size: 29px;
-  color: white;
+  font-size: 27px;
+  color: #fff;
   background: #294f41;
-  border-radius: 11px;
-  width: 42px;
-  height: 42px;
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
   text-align: center;
-  line-height: 37px;
+  line-height: 34px;
 }
 h1 {
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1.3;
   margin: 0;
   font-weight: 650;
 }
 .brand p {
-  font-size: 13px;
+  font-size: 12px;
   color: #596650;
-  margin: 4px 0 0;
+  margin: 2px 0 0;
 }
 .connection {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-size: 12px;
   color: #596650;
   white-space: nowrap;
 }
 .connection i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   background: #999f90;
   border-radius: 50%;
 }
@@ -101,43 +102,39 @@ h1 {
   background: #587743;
 }
 .workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(250px, 1fr);
-  grid-template-areas: "compose summary" "notes summary";
-  gap: 20px 24px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-.composer-panel {
-  grid-area: compose;
-  min-width: 0;
-}
-.notes-panel {
-  grid-area: notes;
+.composer-panel,
+.notes-panel,
+.summary-panel {
+  width: 100%;
   min-width: 0;
 }
 .composer {
   background: #fff;
   border: 1px solid #d7dfcf;
-  border-radius: 14px;
-  padding: 20px;
+  border-radius: 12px;
+  padding: 16px;
 }
 .composer label {
   display: block;
   font-size: 16px;
   font-weight: 650;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 textarea {
   display: block;
   resize: vertical;
-  min-height: 100px;
+  min-height: 80px;
   width: 100%;
   border: 0;
   color: #243d35;
   background: transparent;
   padding: 3px 0;
   font-size: 15px;
-  line-height: 1.8;
+  line-height: 1.7;
 }
 textarea::placeholder {
   color: #687462;
@@ -148,8 +145,8 @@ textarea::placeholder {
   justify-content: space-between;
   gap: 12px;
   border-top: 1px solid #e5eadf;
-  padding-top: 12px;
-  margin-top: 10px;
+  padding-top: 10px;
+  margin-top: 8px;
 }
 .composer-footer > span {
   font-size: 12px;
@@ -162,17 +159,16 @@ textarea::placeholder {
   font-size: 13px;
   color: #42613c;
   margin: 6px 0 0;
-  min-height: 22px;
 }
 .section-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 h2 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 650;
   margin: 0;
 }
@@ -186,7 +182,7 @@ h2 {
 .section-heading p {
   font-size: 12px;
   color: #596650;
-  margin: 3px 0 0;
+  margin: 2px 0 0;
 }
 .text-button,
 .delete-button {
@@ -203,13 +199,13 @@ h2 {
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 .note-card {
   background: #fff;
   border: 1px solid #dce3d4;
-  border-radius: 12px;
-  padding: 12px 10px 12px 16px;
+  border-radius: 10px;
+  padding: 8px 8px 8px 14px;
 }
 .note-row {
   display: flex;
@@ -219,7 +215,7 @@ h2 {
 .note-order {
   color: #596650;
   font-size: 12px;
-  padding-top: 10px;
+  padding-top: 11px;
   font-variant-numeric: tabular-nums;
 }
 .note-row p {
@@ -228,7 +224,7 @@ h2 {
   overflow-wrap: anywhere;
   flex: 1;
   min-width: 0;
-  margin: 7px 0;
+  margin: 9px 0;
 }
 .delete-button {
   flex-shrink: 0;
@@ -238,7 +234,7 @@ h2 {
   color: #92442d;
 }
 .delete-confirm {
-  margin-top: 12px;
+  margin-top: 8px;
   padding: 12px;
   border-top: 1px solid #e5eadf;
   font-size: 13px;
@@ -266,43 +262,49 @@ h2 {
 }
 .empty-state {
   border: 1px dashed #bfcdb3;
-  border-radius: 12px;
-  padding: 25px 18px;
-  text-align: center;
+  border-radius: 10px;
+  padding: 16px;
   color: #596650;
 }
 .empty-state h3 {
-  font-size: 15px;
-  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
 }
 .empty-state p {
   font-size: 13px;
   margin: 0;
 }
 .summary-panel {
-  grid-area: summary;
-  min-width: 0;
-  background: #e9eedf;
-  border: 1px solid #d3ddc6;
-  border-radius: 14px;
-  padding: 20px;
-  position: sticky;
-  top: 18px;
+  background: #eef2e7;
+  border: 1px solid #d8e1ce;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.summary-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 .summary-description {
-  font-size: 13px;
+  font-size: 12px;
   color: #526448;
-  line-height: 1.8;
-  margin: 12px 0 18px;
+  line-height: 1.7;
+  margin: 3px 0 0;
 }
 .summary-button {
-  width: 100%;
-  background: #435b35;
+  flex-shrink: 0;
+  color: #344e2d;
+  background: #dce6cf;
+}
+.summary-button:hover:not(:disabled) {
+  background: #ceddbb;
 }
 .summary-output {
   border-top: 1px solid #cbd7be;
-  margin-top: 18px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 .summary-output p {
   white-space: pre-wrap;
@@ -316,7 +318,7 @@ h2 {
   font-size: 13px;
 }
 .notice {
-  border-radius: 9px;
+  border-radius: 8px;
   padding: 12px;
   margin-top: 12px;
   font-size: 13px;
@@ -341,7 +343,7 @@ h2 {
   color: #81452a;
 }
 .info {
-  background: #f5f7ee;
+  background: #f7f9f2;
   border: 1px solid #cbd7be;
   color: #43563a;
 }
@@ -352,41 +354,28 @@ summary {
 .session-note {
   color: #596650;
   font-size: 12px;
-  border-top: 1px solid #dbe2d4;
-  margin-top: 28px;
-  padding-top: 12px;
+  margin-top: 16px;
 }
 .session-note p {
   max-width: 65ch;
   margin: 8px 0;
 }
-@media (max-width: 720px) {
-  .workspace {
-    grid-template-columns: 1fr;
-    grid-template-areas: "compose" "summary" "notes";
-  }
-  .summary-panel {
-    position: static;
-  }
-}
-@media (max-width: 420px) {
+@media (max-width: 520px) {
   .app-shell {
-    padding: 18px 16px;
-  }
-  .header {
-    flex-wrap: wrap;
-    gap: 12px;
-    padding-bottom: 16px;
-    margin-bottom: 18px;
-  }
-  .composer {
     padding: 16px;
   }
-  .composer-footer {
-    gap: 8px;
+  .header {
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
   }
-  .composer-footer button {
-    padding-inline: 12px;
+  .summary-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .summary-button {
+    align-self: flex-start;
   }
   .note-row {
     gap: 8px;

@@ -74,6 +74,20 @@ try {
   const input = app.getByLabel("写一条笔记");
   const save = app.getByRole("button", { name: "保存笔记", exact: true });
   await expect(save).toBeDisabled();
+  await input.fill("   ");
+  await expect(save).toBeDisabled();
+  await input.fill("");
+  const initialLayout = await app.locator("body").evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+    height: document.documentElement.scrollHeight,
+    viewportHeight: document.documentElement.clientHeight,
+  }));
+  assert.ok(initialLayout.width <= initialLayout.viewportWidth);
+  assert.ok(
+    initialLayout.height <= initialLayout.viewportHeight,
+    "Empty desktop must fit the unmodified harness frame",
+  );
   for (const text of [
     "明天跟客户 follow up",
     "修复登录 bug",
@@ -104,14 +118,7 @@ try {
   await expect(app.getByTestId("note")).toHaveCount(2);
   await expect(app.getByTestId("note").nth(0)).toContainText("follow up");
   await expect(app.getByTestId("note").nth(1)).toContainText("Workshop");
-  // Capture a clean preview before showing the expected disabled-LLM error.
-  const height = await app
-    .locator("body")
-    .evaluate(() => document.documentElement.scrollHeight);
-  await page.locator("#app").evaluate((element, height) => {
-    element.style.height = `${height}px`;
-    element.style.maxHeight = "none";
-  }, height);
+  // Keep the real harness geometry: screenshots must not mask overflow.
   await page
     .locator("#app")
     .screenshot({ path: resolve(directory, "ui-preview.png") });
@@ -125,6 +132,7 @@ try {
   await expect(input).toHaveValue("未保存的草稿应保留");
   await expect(input).toBeEnabled();
   await expect(app.locator(".composer-panel [role=alert]")).toHaveCount(0);
+  await expect(app.locator(".summary-output")).toBeHidden();
   await Promise.all(pending);
   const reads = records.filter((r) => r.ns === "storage" && r.method === "get");
   const writes = records.filter(
@@ -148,14 +156,8 @@ try {
   await page
     .locator("#app")
     .screenshot({ path: resolve(directory, "ui-desktop.png") });
-  await page.locator("#app").evaluate((element) => {
-    element.style.width = "390px";
-    element.style.height = "1600px";
-    element.style.maxHeight = "none";
-  });
-  await app
-    .locator("body")
-    .evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  await page.getByRole("button", { name: "📱 Mobile", exact: true }).click();
+  await expect(app.getByTestId("note")).toHaveCount(2);
   assert.ok(
     await app
       .locator("body")

@@ -49,10 +49,11 @@ export function App() {
     try {
       const anna = await connectAnna();
       const notes = service.current?.notes ?? new NotesRepository(anna);
-      updateNotes(await notes.load());
+      const next = await notes.load();
+      updateNotes(next);
       service.current = { anna, notes };
       setReady(true);
-      setFeedback("笔记已读取。");
+      setFeedback(ready ? `已重新读取 ${next.notes.length} 条笔记。` : "");
     } catch (e) {
       setNoteError({
         title: ready
@@ -179,7 +180,7 @@ export function App() {
               maxLength={MAX_CONTENT}
               disabled={!ready || operation === "save"}
               placeholder="例如：明天跟进客户反馈，整理会议重点…"
-              rows={4}
+              rows={3}
               aria-describedby="input-help"
               onKeyDown={(event) => {
                 if (
@@ -203,7 +204,7 @@ export function App() {
               </button>
             </div>
           </form>
-          <p className="save-feedback" aria-live="polite">
+          <p className="save-feedback" aria-live="polite" hidden={!feedback}>
             {feedback}
           </p>
           {noteError && (
@@ -224,19 +225,26 @@ export function App() {
           )}
         </section>
         <aside className="summary-panel" aria-labelledby="summary-heading">
-          <h2 id="summary-heading">
-            笔记总结 <span className="count">{state.notes.length} 条笔记</span>
-          </h2>
-          <p className="summary-description">
-            整理已保存笔记的重点。输入框中尚未保存的内容不会参与总结。
-          </p>
-          <button
-            className="summary-button"
-            disabled={!ready || busy || state.notes.length === 0}
-            onClick={() => void summarize()}
-          >
-            {operation === "summary" ? "正在生成总结…" : "生成总结 · Summarize"}
-          </button>
+          <div className="summary-toolbar">
+            <div>
+              <h2 id="summary-heading">笔记总结</h2>
+              <p className="summary-description" id="summary-help">
+                {state.notes.length
+                  ? `总结 ${state.notes.length} 条已保存笔记，不包含输入框中的草稿。`
+                  : "保存第一条笔记后，可以在这里生成总结。"}
+              </p>
+            </div>
+            <button
+              className="summary-button"
+              aria-describedby="summary-help"
+              disabled={!ready || busy || state.notes.length === 0}
+              onClick={() => void summarize()}
+            >
+              {operation === "summary"
+                ? "正在生成总结…"
+                : "生成总结 · Summarize"}
+            </button>
+          </div>
           {summaryError && (
             <div
               className={`notice ${summaryError.includes("--no-llm") ? "info" : "error"}`}
@@ -260,7 +268,11 @@ export function App() {
           )}
           <div
             className="summary-output"
-            hidden={Boolean(summaryError) && !summary}
+            hidden={
+              !summary &&
+              (Boolean(summaryError) ||
+                (!summaryHint && operation !== "summary"))
+            }
             aria-live="polite"
             aria-busy={operation === "summary"}
           >
