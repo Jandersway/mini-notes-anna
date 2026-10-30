@@ -8,6 +8,8 @@
 
 CI、故障测试与最终 archive 验证的升级说明见 [自动化验收升级](docs/AUTOMATION-UPGRADE.md)。
 
+界面跟随 Anna 宿主的浅色/深色主题，切换时保留笔记和草稿。主题测试与原题逐项对照见 [宿主主题验收](docs/THEME-REVIEW.md)。Harness 的 record、RPC LOG 和 iframe 地址属于官方调试界面。
+
 ## 快速开始
 
 需要 Node.js 22+、npm、Go 1.23+、[uv](https://docs.astral.sh/uv/getting-started/installation/)。本项目验证使用 Node 24.15.0 / Go 1.27.3 / Anna CLI 0.1.61；npm 依赖固定在 package-lock.json。

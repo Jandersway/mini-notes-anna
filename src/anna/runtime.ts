@@ -17,7 +17,14 @@ export function connectAnna(): Promise<AnnaRuntime> {
     connection = (async () => {
       const sdkUrl = "/static/anna-apps/_sdk/latest/index.js";
       const { AnnaAppRuntime } = await import(/* @vite-ignore */ sdkUrl);
-      return (await AnnaAppRuntime.connect()) as AnnaRuntime;
+      const anna = await AnnaAppRuntime.connect();
+      // The shared connection owns this subscription for the iframe lifetime.
+      // The SDK immediately replays the host theme, including system mode.
+      anna.onThemeChange(({ theme }: { theme: "light" | "dark" }) => {
+        document.documentElement.dataset.theme =
+          theme === "dark" ? "dark" : "light";
+      });
+      return anna as AnnaRuntime;
     })().catch((error) => {
       connection = undefined;
       throw error;

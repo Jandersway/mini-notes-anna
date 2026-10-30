@@ -16,9 +16,10 @@ const directory = resolve(root, "test-results");
 mkdirSync(directory, { recursive: true });
 for (const name of ["ui-failure.txt", "ui-failure.png"])
   rmSync(resolve(directory, name), { force: true });
-async function openCase(scenario) {
+async function openCase(scenario, colorScheme = "light") {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1100 },
+    colorScheme,
   });
   activePage = page;
   page.on("request", (request) => {
@@ -191,6 +192,68 @@ try {
     `PASS: actual Anna iframe create/read/delete/reload + tools.invoke expected --no-llm error. ${reads.length} storage.get / ${writes.length} storage.set / ${invokes.length} tools.invoke recorded.`,
   );
   await page.close();
+
+  // Exercise the official host control, including initial system-dark context.
+  const themed = await openCase("host-theme", "dark");
+  const themedRoot = themed.app.locator("html");
+  await expect(themedRoot).toHaveAttribute("data-theme", "dark");
+  await expect(themedRoot).toHaveCSS("color-scheme", "dark");
+  const darkBackground = await themedRoot.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  await themed.input.fill("主题切换后，已保存的笔记仍保留");
+  await themed.save.click();
+  await themed.input.fill("切换主题不会清空这段草稿");
+  await themed.page.locator("#ctx-theme").click();
+  await expect(themedRoot).toHaveAttribute("data-theme", "light");
+  await expect(themedRoot).toHaveCSS("color-scheme", "light");
+  assert.notEqual(
+    await themedRoot.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+    darkBackground,
+    "Host theme must change actual rendered colors",
+  );
+  await expect(themed.input).toHaveValue("切换主题不会清空这段草稿");
+  await expect(themed.app.getByTestId("note")).toHaveCount(1);
+  await themed.page
+    .locator("#app")
+    .screenshot({ path: resolve(directory, "ui-theme-light.png") });
+  await themed.app
+    .getByRole("button", { name: "删除笔记 1", exact: true })
+    .click();
+  await themed.page.locator("#ctx-theme").click();
+  await expect(themedRoot).toHaveAttribute("data-theme", "dark");
+  await expect(
+    themed.app.getByRole("button", { name: "确认删除", exact: true }),
+  ).toBeVisible();
+  await expect(themed.input).toHaveValue("切换主题不会清空这段草稿");
+  await themed.app.getByRole("button", { name: "取消", exact: true }).click();
+  await themed.app
+    .getByRole("button", { name: "生成总结 · Summarize" })
+    .click();
+  await expect(themed.app.getByRole("alert")).toContainText(
+    "harness started with --no-llm",
+    { timeout: 15000 },
+  );
+  await themed.page
+    .locator("#app")
+    .screenshot({ path: resolve(directory, "ui-theme-dark.png") });
+  await themed.page.locator("#ff-mobile").click();
+  await expect(themedRoot).toHaveAttribute("data-theme", "dark");
+  await expect(themed.app.getByTestId("note")).toHaveCount(1);
+  assert.ok(
+    await themedRoot.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  );
+  await themed.page
+    .locator("#app")
+    .screenshot({ path: resolve(directory, "ui-theme-dark-mobile.png") });
+  await themed.page.close();
+  console.log(
+    "PASS: initial host theme, live light/dark switching, preserved draft/notes/confirmation, and dark mobile layout.",
+  );
 
   // Inject failures only, never a successful storage or summary replacement.
   // Each scenario owns a new harness session; user preview sessions are untouched.
