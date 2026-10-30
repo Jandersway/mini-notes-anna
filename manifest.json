@@ -10,6 +10,7 @@
   "permissions": ["storage.read", "storage.write"],
   "tags": ["notes", "productivity"],
   "ui": {
+    "form_factors": ["desktop", "mobile"],
     "bundle": {
       "format": "static-spa",
       "entry": "index.html",

@@ -2,7 +2,9 @@
 
 在 Anna iframe 中创建、查看、删除笔记，并通过本地 Go Executa 向 host 发起 LLM sampling 请求。
 
-![Mini Notes 在真实 Anna harness 中的界面](docs/evidence/ui-preview.png)
+![Mini Notes 在真实 Anna harness 中的界面](docs/ui-review/desktop.jpg)
+
+界面设计与本次验证范围见 [UI 可用性检查](docs/UI-REVIEW.md)。`docs/evidence/` 保留 v0.1.0 发布时的验收快照。
 
 ## 快速开始
 
@@ -28,13 +30,13 @@ uvx --from anna-app-runtime-local==0.2.0a30 python -c "import anna_app_runtime_l
 
 ## 使用与验收
 
-1. 输入内容并保存：空白输入不可保存；写入成功后输入清空。
+1. 输入内容并保存：空白输入不可保存；支持 Ctrl / ⌘ + Enter；写入成功后输入清空并恢复焦点。
 2. 查看列表：显示内容和稳定的添加顺序。
-3. 删除笔记：storage 写入成功后列表更新，剩余序号不重排，新笔记不复用已删除的序号。
+3. 删除笔记：先显示确认操作，可取消或按 Esc 返回；确认后 storage 写入成功才更新列表，剩余序号不重排，新笔记不复用已删除的序号。
 4. 点击“刷新”，或仅刷新 iframe：通过 storage.get 重新读取。不要刷新外层 dashboard 来测试持久性，因为它会创建新的本地 session。
 5. 点击 **Summarize**：前端读取当前笔记快照并调用 tools.invoke。
 
-在 `--no-llm` 下，第 5 步预期显示：
+在 `--no-llm` 下，第 5 步在总结区域显示“当前环境未启用模型”；展开“查看详情”可见：
 
 ```text
 [-32603] harness started with --no-llm

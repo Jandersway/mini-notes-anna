@@ -1,104 +1,145 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { connectAnna, errorMessage, type AnnaRuntime } from "./anna/runtime";
 import { NotesRepository } from "./anna/storage";
 import { summarizeNotes } from "./anna/tools";
 import { emptyState, MAX_CONTENT, type NotesState } from "./notes/model";
 
+type Operation = "load" | "save" | "delete" | "summary" | null;
+type Notice = { title: string; detail: string } | null;
 export function App() {
   const [state, setState] = useState<NotesState>(emptyState);
   const [input, setInput] = useState("");
-  const [status, setStatus] = useState("正在连接 Anna…");
-  const [error, setError] = useState("");
-  const [summary, setSummary] = useState("");
-  const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [summarizing, setSummarizing] = useState(false);
+  const [operation, setOperation] = useState<Operation>("load");
+  const [noteError, setNoteError] = useState<Notice>(null);
+  const [feedback, setFeedback] = useState("");
+  const [summary, setSummary] = useState("");
+  const [summaryError, setSummaryError] = useState("");
+  const [summaryHint, setSummaryHint] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const service = useRef<{ anna: AnnaRuntime; notes: NotesRepository } | null>(
     null,
   );
   const locked = useRef(false);
-
+  const summarySnapshot = useRef("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const listHeading = useRef<HTMLHeadingElement>(null);
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const busy = operation !== null;
+  const localSession =
+    ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) &&
+    location.pathname.includes("/dev/");
+  function updateNotes(next: NotesState) {
+    if (
+      summarySnapshot.current &&
+      summarySnapshot.current !== JSON.stringify(next.notes)
+    ) {
+      setSummary("");
+      setSummaryHint("笔记已更新，请重新生成总结。");
+      summarySnapshot.current = "";
+    }
+    setState(next);
+  }
   async function load() {
     if (locked.current) return;
     locked.current = true;
-    setBusy(true);
-    setError("");
+    setOperation("load");
+    setNoteError(null);
     try {
       const anna = await connectAnna();
-      const notes = new NotesRepository(anna);
-      setState(await notes.load());
+      const notes = service.current?.notes ?? new NotesRepository(anna);
+      updateNotes(await notes.load());
       service.current = { anna, notes };
-      setSummary("");
       setReady(true);
-      setStatus("已连接 · 笔记已同步");
+      setFeedback("笔记已读取。");
     } catch (e) {
-      setError(errorMessage(e));
-      setReady(false);
-      setStatus("连接未完成");
+      setNoteError({
+        title: ready
+          ? "刷新失败，已显示的笔记仍保留"
+          : "尚未读取笔记，请重试连接",
+        detail: errorMessage(e),
+      });
     } finally {
       locked.current = false;
-      setBusy(false);
+      setOperation(null);
     }
   }
   useEffect(() => {
     void load();
   }, []);
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    if (locked.current || !service.current || !input.trim()) return;
+  useEffect(() => {
+    if (pendingDelete) cancelButton.current?.focus();
+  }, [pendingDelete]);
+  async function save() {
+    if (locked.current || !ready || !service.current || !input.trim()) return;
     locked.current = true;
-    setBusy(true);
-    setError("");
+    setOperation("save");
+    setNoteError(null);
+    setFeedback("");
     try {
-      setState(await service.current.notes.add(input));
+      const next = await service.current.notes.add(input);
+      updateNotes(next);
       setInput("");
-      setSummary("");
-      setStatus("已保存");
+      setPendingDelete(null);
+      setFeedback(`第 ${next.notes.at(-1)?.order} 条笔记已保存。`);
+      requestAnimationFrame(() => inputRef.current?.focus());
     } catch (e) {
-      setError(errorMessage(e));
+      setNoteError({
+        title: "保存失败，输入内容已保留",
+        detail: errorMessage(e),
+      });
     } finally {
       locked.current = false;
-      setBusy(false);
+      setOperation(null);
     }
+  }
+  function cancelDelete() {
+    setPendingDelete(null);
+    requestAnimationFrame(() => deleteTrigger.current?.focus());
   }
   async function remove(id: string) {
     if (locked.current || !service.current) return;
     locked.current = true;
-    setBusy(true);
-    setError("");
+    setOperation("delete");
+    setNoteError(null);
+    setFeedback("");
     try {
-      setState(await service.current.notes.remove(id));
-      setSummary("");
-      setStatus("已删除");
+      updateNotes(await service.current.notes.remove(id));
+      setPendingDelete(null);
+      setFeedback("笔记已删除。");
+      requestAnimationFrame(() => listHeading.current?.focus());
     } catch (e) {
-      setError(errorMessage(e));
+      setNoteError({ title: "删除失败，笔记仍保留", detail: errorMessage(e) });
     } finally {
       locked.current = false;
-      setBusy(false);
+      setOperation(null);
     }
   }
   async function summarize() {
     if (locked.current || !service.current) return;
     locked.current = true;
-    setBusy(true);
-    setSummarizing(true);
-    setError("");
-    setSummary("");
+    setOperation("summary");
+    setSummaryError("");
+    setSummaryHint("");
+    setPendingDelete(null);
     try {
       const snapshot = await service.current.notes.load();
-      setState(snapshot);
+      updateNotes(snapshot);
+      if (!snapshot.notes.length) {
+        setSummaryHint("先保存一条笔记，再生成总结。");
+        return;
+      }
       setSummary(await summarizeNotes(service.current.anna, snapshot.notes));
-      setStatus("总结已更新");
+      summarySnapshot.current = JSON.stringify(snapshot.notes);
+      setSummaryHint("");
     } catch (e) {
-      setError(errorMessage(e));
+      setSummaryError(errorMessage(e));
     } finally {
       locked.current = false;
-      setBusy(false);
-      setSummarizing(false);
+      setOperation(null);
     }
   }
-
   return (
     <main className="app-shell">
       <header className="header">
@@ -106,131 +147,236 @@ export function App() {
           <span className="brand-mark" aria-hidden="true">
             m.
           </span>
-          <span>MINI NOTES</span>
+          <div>
+            <h1>Mini Notes</h1>
+            <p>随手记录，按需总结。</p>
+          </div>
         </div>
         <span className="connection" role="status">
           <i className={ready ? "online" : ""} />
-          {status}
+          {ready
+            ? "Anna 已连接"
+            : operation === "load"
+              ? "正在连接…"
+              : "尚未连接"}
         </span>
       </header>
-      <section className="intro">
-        <p className="eyebrow">A LITTLE SPACE FOR YOUR THOUGHTS</p>
-        <h1>
-          记下来，<span>理清思绪。</span>
-        </h1>
-        <p>随手记录灵感、待办与日常，让重要的事留在眼前。</p>
-      </section>
-      {error && (
-        <div className="error" role="alert">
-          <strong>暂时未能完成</strong>
-          <p>{error}</p>
-          {error.includes("--no-llm") && (
-            <p>
-              当前调试模式关闭了 LLM，这是预期结果。后端总结可通过 mock sampling
-              单独验证。
-            </p>
-          )}
-        </div>
-      )}
-      {!ready && !busy && (
-        <button className="secondary" onClick={() => void load()}>
-          重新连接
-        </button>
-      )}
       <div className="workspace">
-        <section className="notes-panel" aria-label="笔记">
-          <form onSubmit={save} className="composer">
-            <label htmlFor="note-content">此刻，想到什么？</label>
+        <section className="composer-panel" aria-label="记录笔记">
+          <form
+            className="composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}
+          >
+            <label htmlFor="note-content">写一条笔记</label>
             <textarea
               id="note-content"
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               maxLength={MAX_CONTENT}
-              disabled={!ready || busy}
-              placeholder="一个灵感、一件待办，或想留住的一句话…"
+              disabled={!ready || operation === "save"}
+              placeholder="例如：明天跟进客户反馈，整理会议重点…"
               rows={4}
+              aria-describedby="input-help"
+              onKeyDown={(event) => {
+                if (
+                  (event.ctrlKey || event.metaKey) &&
+                  event.key === "Enter" &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  void save();
+                }
+              }}
             />
             <div className="composer-footer">
-              <span>
-                {input.length} / {MAX_CONTENT}
+              <span id="input-help">
+                Ctrl / ⌘ + Enter 保存
+                <br />
+                {input.length} / {MAX_CONTENT} 字符
               </span>
               <button type="submit" disabled={!ready || busy || !input.trim()}>
-                ＋ 保存笔记
+                {operation === "save" ? "正在保存…" : "保存笔记"}
               </button>
             </div>
           </form>
-          <div className="section-heading">
-            <h2>
-              我的笔记{" "}
-              <span>{state.notes.length.toString().padStart(2, "0")}</span>
-            </h2>
-            <button
-              className="text-button"
-              disabled={!ready || busy}
-              onClick={() => void load()}
-            >
-              刷新
-            </button>
-          </div>
-          {state.notes.length === 0 ? (
-            <div className="empty-state">
-              <span aria-hidden="true">≡</span>
-              <h3>给第一个想法留个位置</h3>
-              <p>在上方写下内容，保存后就会出现在这里。</p>
+          <p className="save-feedback" aria-live="polite">
+            {feedback}
+          </p>
+          {noteError && (
+            <div className="notice error" role="alert">
+              <strong>{noteError.title}</strong>
+              <details>
+                <summary>查看详情</summary>
+                <p>{noteError.detail}</p>
+              </details>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => void load()}
+              >
+                {ready ? "重新读取笔记" : "重新连接"}
+              </button>
             </div>
-          ) : (
-            <ol className="note-list">
-              {state.notes.map((note) => (
-                <li key={note.id} className="note-card" data-testid="note">
-                  <span className="note-order">
-                    {note.order.toString().padStart(2, "0")}
-                  </span>
-                  <p>{note.content}</p>
-                  <button
-                    className="delete-button"
-                    disabled={busy}
-                    aria-label={`删除笔记 ${note.order}`}
-                    onClick={() => void remove(note.id)}
-                  >
-                    删除
-                  </button>
-                </li>
-              ))}
-            </ol>
           )}
         </section>
-        <aside className="summary-panel">
-          <div className="summary-icon" aria-hidden="true">
-            ✳
-          </div>
-          <p className="eyebrow">A MOMENT OF CLARITY</p>
-          <h2>从记录，到重点。</h2>
+        <aside className="summary-panel" aria-labelledby="summary-heading">
+          <h2 id="summary-heading">
+            笔记总结 <span className="count">{state.notes.length} 条笔记</span>
+          </h2>
           <p className="summary-description">
-            把零散想法整理成简短总结，看看接下来值得关注什么。
+            整理已保存笔记的重点。输入框中尚未保存的内容不会参与总结。
           </p>
           <button
             className="summary-button"
             disabled={!ready || busy || state.notes.length === 0}
             onClick={() => void summarize()}
           >
-            {summarizing ? "正在整理…" : "Summarize · 生成总结"}
+            {operation === "summary" ? "正在生成总结…" : "生成总结 · Summarize"}
           </button>
-          <div className="summary-output" aria-live="polite">
+          {summaryError && (
+            <div
+              className={`notice ${summaryError.includes("--no-llm") ? "info" : "error"}`}
+              role="alert"
+            >
+              <strong>
+                {summaryError.includes("--no-llm")
+                  ? "当前环境未启用模型"
+                  : "总结生成失败"}
+              </strong>
+              <p>
+                {summaryError.includes("--no-llm")
+                  ? "暂时无法生成总结，笔记仍可正常保存和删除。"
+                  : "请稍后重试，你的笔记仍保留。"}
+              </p>
+              <details>
+                <summary>查看详情</summary>
+                <p>{summaryError}</p>
+              </details>
+            </div>
+          )}
+          <div
+            className="summary-output"
+            hidden={Boolean(summaryError) && !summary}
+            aria-live="polite"
+            aria-busy={operation === "summary"}
+          >
             {summary ? (
-              <p data-testid="summary">{summary}</p>
+              <>
+                {summaryError && (
+                  <p className="summary-placeholder">上一次生成的总结</p>
+                )}
+                <p data-testid="summary">{summary}</p>
+              </>
             ) : (
               <p className="summary-placeholder">
-                {summarizing ? "正在等待总结结果…" : "你的重点，会出现在这里。"}
+                {operation === "summary"
+                  ? "正在整理已保存的笔记，你可以继续在输入框中记录想法。"
+                  : summaryHint ||
+                    (state.notes.length
+                      ? "点击上方按钮，查看笔记重点。"
+                      : "保存第一条笔记后，就可以生成总结。")}
               </p>
             )}
           </div>
-          <span className="summary-footnote">每次总结以当前笔记为准</span>
         </aside>
+        <section className="notes-panel" aria-labelledby="notes-heading">
+          <div className="section-heading">
+            <div>
+              <h2 id="notes-heading" ref={listHeading} tabIndex={-1}>
+                我的笔记 <span className="count">{state.notes.length}</span>
+              </h2>
+              <p>按添加顺序排列</p>
+            </div>
+            <button
+              className="text-button"
+              disabled={!ready || busy}
+              onClick={() => void load()}
+            >
+              {operation === "load" && ready ? "读取中…" : "刷新"}
+            </button>
+          </div>
+          {!ready ? (
+            <div className="empty-state">
+              <p>
+                {operation === "load"
+                  ? "正在读取笔记…"
+                  : "连接成功后，在这里查看已保存的笔记。"}
+              </p>
+            </div>
+          ) : state.notes.length === 0 ? (
+            <div className="empty-state">
+              <h3>还没有笔记</h3>
+              <p>在上方写下内容，点击“保存笔记”即可。</p>
+            </div>
+          ) : (
+            <ol className="note-list">
+              {state.notes.map((note) => (
+                <li key={note.id} className="note-card" data-testid="note">
+                  <div className="note-row">
+                    <span className="note-order">
+                      {note.order.toString().padStart(2, "0")}
+                    </span>
+                    <p>{note.content}</p>
+                    <button
+                      className="delete-button"
+                      disabled={busy}
+                      aria-label={`删除笔记 ${note.order}`}
+                      aria-expanded={pendingDelete === note.id}
+                      onClick={(event) => {
+                        deleteTrigger.current = event.currentTarget;
+                        setPendingDelete(note.id);
+                      }}
+                    >
+                      删除
+                    </button>
+                  </div>
+                  {pendingDelete === note.id && (
+                    <div
+                      className="delete-confirm"
+                      role="group"
+                      aria-label={`确认删除笔记 ${note.order}`}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape" && !busy) cancelDelete();
+                      }}
+                    >
+                      <p>删除这条笔记？删除后无法恢复。</p>
+                      <div>
+                        <button
+                          className="secondary"
+                          ref={cancelButton}
+                          disabled={busy}
+                          onClick={cancelDelete}
+                        >
+                          取消
+                        </button>
+                        <button
+                          className="danger"
+                          disabled={busy}
+                          onClick={() => void remove(note.id)}
+                        >
+                          {operation === "delete" ? "正在删除…" : "确认删除"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       </div>
-      <footer className="footer">
-        <span>小小记录，慢慢清晰。</span>
-        <span>MINI NOTES / ANNA APP</span>
-      </footer>
+      {localSession && (
+        <details className="session-note">
+          <summary>关于本地会话</summary>
+          <p>
+            当前本地预览的笔记保存在调试会话中。刷新整个调试页面或重启服务会开启新会话；应用内“刷新”用于重新读取当前会话的笔记。
+          </p>
+        </details>
+      )}
     </main>
   );
 }

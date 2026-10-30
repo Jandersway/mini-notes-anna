@@ -71,8 +71,8 @@ try {
   await expect(app.getByRole("status")).toContainText("已连接", {
     timeout: 25000,
   });
-  const input = app.getByLabel("此刻，想到什么？");
-  const save = app.getByRole("button", { name: "＋ 保存笔记" });
+  const input = app.getByLabel("写一条笔记");
+  const save = app.getByRole("button", { name: "保存笔记", exact: true });
   await expect(save).toBeDisabled();
   for (const text of [
     "明天跟客户 follow up",
@@ -85,6 +85,14 @@ try {
   }
   await expect(app.getByTestId("note")).toHaveCount(3);
   await app.getByRole("button", { name: "删除笔记 2", exact: true }).click();
+  await expect(app.getByTestId("note")).toHaveCount(3);
+  await expect(
+    app.getByRole("button", { name: "取消", exact: true }),
+  ).toBeFocused();
+  await app.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(app.getByTestId("note")).toHaveCount(3);
+  await app.getByRole("button", { name: "删除笔记 2", exact: true }).click();
+  await app.getByRole("button", { name: "确认删除", exact: true }).click();
   await expect(app.getByTestId("note")).toHaveCount(2);
   await app.getByRole("button", { name: "刷新", exact: true }).click();
   await expect(app.getByTestId("note")).toHaveCount(2);
@@ -107,12 +115,16 @@ try {
   await page
     .locator("#app")
     .screenshot({ path: resolve(directory, "ui-preview.png") });
-  await app.getByRole("button", { name: "Summarize · 生成总结" }).click();
+  await input.fill("未保存的草稿应保留");
+  await app.getByRole("button", { name: "生成总结 · Summarize" }).click();
   await expect(app.getByRole("alert")).toContainText(
     "harness started with --no-llm",
     { timeout: 15000 },
   );
   await expect(app.getByTestId("summary")).toHaveCount(0);
+  await expect(input).toHaveValue("未保存的草稿应保留");
+  await expect(input).toBeEnabled();
+  await expect(app.locator(".composer-panel [role=alert]")).toHaveCount(0);
   await Promise.all(pending);
   const reads = records.filter((r) => r.ns === "storage" && r.method === "get");
   const writes = records.filter(
