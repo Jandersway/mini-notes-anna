@@ -1,18 +1,12 @@
 # Mini Notes — Anna App
 
-在 Anna iframe 中创建、查看、删除笔记，并通过本地 Go Executa 向 host 发起 LLM sampling 请求。
+一个在 Anna 本地开发环境中运行的笔记应用，支持创建、查看、删除笔记和生成总结。笔记通过 Anna storage API 保存，总结由本地 Go Executa 通过 sampling 请求生成。
 
-![Mini Notes 在真实 Anna harness 中的界面](docs/ui-review/desktop.jpg)
-
-界面设计与本次验证范围见 [UI 可用性检查](docs/UI-REVIEW.md)。`docs/evidence/` 保留 v0.1.0 发布时的验收快照。
-
-CI、故障测试与最终 archive 验证的升级说明见 [自动化验收升级](docs/AUTOMATION-UPGRADE.md)。
-
-界面跟随 Anna 宿主的浅色/深色主题，切换时保留笔记和草稿。主题测试与原题逐项对照见 [宿主主题验收](docs/THEME-REVIEW.md)。Harness 的 record、RPC LOG 和 iframe 地址属于官方调试界面。
+![Mini Notes](docs/ui-review/desktop.jpg)
 
 ## 快速开始
 
-需要 Node.js 22+、npm、Go 1.23+、[uv](https://docs.astral.sh/uv/getting-started/installation/)。本项目验证使用 Node 24.15.0 / Go 1.27.3 / Anna CLI 0.1.61；npm 依赖固定在 package-lock.json。
+需要 Node.js 22+、npm、Go 1.23+、[uv](https://docs.astral.sh/uv/getting-started/installation/)。CI 使用 Node.js 24 和 Go 1.27.3；npm 依赖由 package-lock.json 固定。
 
 ```sh
 npm ci
@@ -24,31 +18,28 @@ npm run dev:ui
 
 打开终端显示的 `http://localhost:5180/`。也可以用 `npm run dev` 一次完成构建和启动。
 
-这些命令使用 `anna-app dev --no-llm` 和默认的 legacy in-memory runtime_state，不需要 Anna 登录、真实 LLM key 或数据库。请从 Anna dashboard 打开的 iframe 操作；单独打开 bundle/index.html 不具备宿主环境。
+启动命令使用 `anna-app dev --no-llm`，无需登录 Anna、配置 API key 或数据库。应用运行在 Anna 调试页面的 iframe 中。
 
-**首次启动会自动预热 runtime。** `npm run dev`、`dev:ui` 和 `test:ui` 都先运行 `prepare:harness`，从已安装 CLI 中读取唯一的 runtime pin，再准备同一官方 Python 环境，避免首次下载耗尽 bridge 的 8 秒握手时间。首次准备需要网络，之后可复用缓存。也可单独执行：
+启动脚本会准备 Anna CLI 所需的 Python 运行环境，首次下载依赖需要网络。也可用 `npm run prepare:harness` 单独执行环境准备。
 
-```sh
-npm run prepare:harness
-```
-
-## 使用与验收
+## 使用
 
 1. 输入内容并保存：空白输入不可保存；支持 Ctrl / ⌘ + Enter；写入成功后输入清空并恢复焦点。
 2. 查看列表：显示内容和稳定的添加顺序。
 3. 删除笔记：先显示确认操作，可取消或按 Esc 返回；确认后 storage 写入成功才更新列表，剩余序号不重排，新笔记不复用已删除的序号。
-4. 点击“刷新”，或仅刷新 iframe：通过 storage.get 重新读取。不要刷新外层 dashboard 来测试持久性，因为它会创建新的本地 session。
+4. 点击“刷新”，或仅刷新 iframe：通过 storage.get 重新读取当前会话的笔记。
 5. 点击 **Summarize**：前端读取当前笔记快照并调用 tools.invoke。
+6. 切换主题：界面跟随 Anna 的浅色/深色设置，保留笔记和草稿。
 
-在 `--no-llm` 下，第 5 步在总结区域显示“当前环境未启用模型”；展开“查看详情”可见：
+`--no-llm` 会关闭模型调用。点击 Summarize 后，应用仍调用 `anna.tools.invoke`，界面显示“当前环境未启用模型”，错误详情为：
 
 ```text
 [-32603] harness started with --no-llm
 ```
 
-这是宿主明确关闭 LLM 后的正常结果，不是后端 sampling 实现失败。UI 不会用固定文本伪造总结。后端成功路径用下一节的独立 fixture 测试验证。
+这条路径用于检查界面与工具的连接。总结结果的返回流程通过下面的独立 sampling 测试检查。
 
-本地 legacy runtime_state 仅用于免登录调试。外层 dashboard 刷新或 dev 进程重启后数据不保证保留；生产 Anna storage 可由 APS KV 支撑，两者使用相同 Host API，但本项目不声称验证了真实云端 APS。
+本地笔记保存在 Anna 的 `legacy in-memory runtime_state` 中。刷新整个调试页面或重启服务会创建新会话。
 
 ## 后端 sampling 测试
 
@@ -56,26 +47,23 @@ npm run prepare:harness
 npm run test:sampling
 ```
 
-该脚本执行真实的 `anna-app executa dev --mock-sampling` 子进程，并断言 summary 与 fixture 的 host 响应一致、stderr 存在 sampling 请求与响应记录。原始命令也可逐项执行：
+脚本运行 `anna-app executa dev --mock-sampling`，使用 `fixtures/sampling-success.jsonl` 提供采样响应，检查返回的总结与该响应一致，并检查 sampling 请求和回复日志。也可以直接启动交互式测试：
 
 ```sh
 npx anna-app executa dev --dir executas/notes-summary --mock-sampling fixtures/sampling-success.jsonl --no-agent --no-image --no-upload
 ```
 
-这是交互 REPL。也可运行 one-shot（以下参数用单引号包住，适用于 PowerShell 7 与常见 Unix shell）：
+单次调用示例，适用于 PowerShell 7 与常见 Unix shell：
 
 ```sh
 npx anna-app executa dev --dir executas/notes-summary --mock-sampling fixtures/sampling-success.jsonl --no-agent --no-image --no-upload --invoke summarize --args '{"notes":[{"order":1,"content":"明天跟客户 follow up"},{"order":2,"content":"修复登录 bug"},{"order":3,"content":"Workshop 内容想法"}]}' --json
 ```
 
-fixture 是 host 侧离线测试数据，不是模型真实输出；Tool 中不包含该总结字符串。修改 fixture 返回文本后，测试会验证返回值随之变化。没有 UI tools.invoke mock 替代后端 sampling。
-
-证据位置：
+测试结果写入：
 
 - `test-results/sampling-cli.json`：最终 invoke 结果。
 - `test-results/sampling-cli.stderr.log`：`sampling.request`、`sampling.response`，带 invoke_id 与 sampling_id。
-- `test-results/protocol.jsonl`：双向原始 JSON-RPC transcript，包括真正的 `sampling/createMessage` 帧。
-- `docs/evidence/`：本地实际验收的固定快照及说明。
+- `test-results/protocol.jsonl`：协议测试生成的双向 JSON-RPC 记录，包含 `sampling/createMessage`。
 
 ## 手动协议检查
 
@@ -107,7 +95,7 @@ npm run test:protocol
 }
 ```
 
-这里的 `sampling:1` 只是首条请求示例，实际必须匹配收到的 ID。Tool 随后才会返回 `id:3` 的 invoke 结果。只把 invoke 输入一次就关闭 stdin，无法完成双向 sampling。
+`sampling:1` 是示例值，回复时应匹配收到的 ID。Tool 收到采样回复后，返回原始 `id:3` 的 invoke 结果。
 
 仅检查 describe 时，可以使用单向输入。例如 PowerShell 7：
 
@@ -117,7 +105,7 @@ npm run test:protocol
 
 stdout 只含 JSON-RPC 帧（响应与反向请求），日志写 stderr，每帧换行并 flush。进程持续读取直到 EOF 或显式 shutdown。`NOTES_SAMPLING_TIMEOUT_MS` 可缩短测试超时，默认 55 秒；不得超过默认值。
 
-## 平台调用链与兼容说明
+## 实现结构
 
 ```text
 iframe → AnnaAppRuntime.connect()
@@ -125,25 +113,25 @@ iframe → AnnaAppRuntime.connect()
        → anna.tools.invoke({tool_id, method:"summarize", args:{notes}})
        → Go Executa invoke
        → reverse sampling/createMessage
-       → host LLM / 后端测试 sampling fixture
-       → invoke result.data.summary → Host 解包 → UI
+       → Anna 返回采样结果
+       → Tool 返回 data.summary → Anna 将结果交给界面显示
 ```
 
 - **App manifest**：声明窗口、构建后 bundle 入口和 Host API 权限。`ui.bundle.entry: index.html` 相对于 CLI 默认 bundle 根目录，实际文件为构建后的 `bundle/index.html`。
 - **Tool manifest**：描述 summarize 的 `parameters[]`、`host_capabilities: ["llm.sample"]` 与 runtime。describe 直接返回此 manifest。
-- **工具身份**：本地使用 `tool-local-notes-summary-12345678`，在 App manifest、executa.json、Tool manifest 和前端常量中一致；前端从 Tool manifest 导入 name。`npm run validate` 自动核查。此 ID 只用于本题免登录本地开发；线上发布 Anna Tool 时另需真实服务器身份，本题不要求该流程。
-- **Storage / APS KV**：`src/anna/storage.ts` 只通过 get/set 读改写 `mini-notes:v1`；无 localStorage、IndexedDB、文件持久化或自建 HTTP API。
-- **Sampling**：单一 stdin reader 将 host 请求与 reverse response 分流；invoke worker 等待 sampling 时 reader 仍能接收响应。metadata 和 context 带关联 invoke_id。只提取 host 返回文本，不使用规则替代总结。
-- **Binary archive**：根 manifest.json 描述安装入口与权限，bin/ 内是独立 Go binary，不依赖 Node/Python/Go 解释器。`scripts/run-tool.mjs` 仅是跨平台本地开发启动器，不放入发布包。
+- **工具 ID**：`tool-local-notes-summary-12345678` 在 App manifest、executa.json、Tool manifest 中保持一致。前端从 Tool manifest 导入 ID，`npm run validate` 检查这些配置。
+- **Storage / APS KV**：`src/anna/storage.ts` 使用 `anna.storage.get/set` 读写 `mini-notes:v1`。Anna storage 是访问接口，APS KV 是其存储后端之一；本地调试使用内存会话。写入在当前窗口中排队执行。
+- **Sampling**：Tool 将笔记和总结提示发送给 Anna。单个 stdin 读取循环分发请求与回复，invoke_id 和 sampling ID 用于关联调用；Tool 提取采样结果中的文本返回。
+- **二进制包**：根目录 manifest.json 描述入口和权限，bin/ 中放置 Go 可执行文件。`scripts/run-tool.mjs` 用于本地开发时启动该文件。
 
-已核实 CLI 0.1.61 使用 runtime-local 0.2.0a30，其 UI ExecutaPool 有两处与 standalone runner 不同的行为：
+### 本地 CLI 适配
 
-1. UI pool 直接发送 invoke，不发送 initialize。仅本地启动器设置 `NOTES_ALLOW_LEGACY_HARNESS=1` 以支持此路径。直接运行发行 binary 默认仍要求 v2 协商；显式协商为 v1 后，兼容开关也不会开启 sampling。独立后端测试会正常执行 initialize v2。
-2. UI pool 把 reverse sampling 映射到宿主的 llm.complete 桥接路径，所以 App manifest 必须声明 `ui.host_api.llm: ["complete"]`。**前端代码从未调用 anna.llm.complete**；该权限用于本地宿主处理 Tool 的 sampling。缺少它会先得到权限错误，无法到达预期的 `--no-llm` 错误。
+项目使用 Anna CLI 0.1.61 和 runtime-local 0.2.0a30。
 
-以上兼容来自实际安装的官方 runtime 行为，未修改官方依赖文件。
+- 此版本的 UI 工具进程池直接发送 invoke。本地启动器通过 `NOTES_ALLOW_LEGACY_HARNESS=1` 接受这一调用方式；独立运行二进制时，sampling 使用 initialize v2 协商。
+- UI 工具进程池通过 `llm.complete` 转发 sampling，因此 App manifest 声明 `ui.host_api.llm: ["complete"]`。前端的调用入口为 `anna.tools.invoke`。
 
-## 测试与调用证据
+## 自动化测试
 
 ```sh
 npm run check
@@ -156,23 +144,24 @@ npm run check
 ```sh
 npx playwright install chromium
 npm run test:ui
-# 包含上述 UI 验收的完整检查（CI 与发布前门禁使用同一个命令）
+# 运行全部检查
 npm run check:all
 ```
 
-它启动真正的 Anna harness，在独立会话中验证三组场景：
+UI 测试使用独立的 Anna 会话，覆盖四组场景：
 
-1. 创建、删除确认/取消、刷新、iframe 重新挂载、真实 tools.invoke、预期的禁用 LLM 错误，以及默认窗口/窄屏布局；不拉高 iframe 隐藏溢出。
-2. 仅拦截 storage.set 注入失败，验证草稿和已保存笔记保留、删除失败后数据不丢失、解除故障后重试成功。成功的 storage 操作始终调用真实 Host API。
-3. 笔记及错误详情中的 HTML/script 字符串只呈现为文本；全部场景均断言前端没有调用 llm namespace。
+1. 创建、删除确认/取消、刷新列表与 iframe、tools.invoke，以及默认窗口和窄屏布局。
+2. 深浅主题初始加载与切换，检查草稿、笔记和删除确认状态是否保留。
+3. 模拟 storage.set 失败，检查数据保留及恢复后的重试。
+4. 将 HTML/script 字符串作为笔记和错误内容，检查其按文本显示。
 
-UI harness 不注入成功的总结或存储 mock。后端 sampling 成功仍由官方 standalone fixture 路径独立验证。Linux CI 使用 `npx playwright install --with-deps chromium` 安装浏览器及系统依赖。
+Linux 使用 `npx playwright install --with-deps chromium` 安装浏览器及系统依赖。
 
 已有 Chrome 时，可在 PowerShell 7 设置 `$env:BROWSER_CHANNEL = 'chrome'` 后运行；也支持 `HARNESS_URL` 指向已启动的本地 harness。默认测试端口为 5189。
 
-查看 `test-results/ui-rpc.jsonl` 中的 `scenario`、`ns:storage, method:get/set` 和 `ns:tools, method:invoke`。该文件只保存合成验收数据与相关调用结果，不保存 session token。`storage-failure` 和 `safe-text` 场景中的失败响应由测试明确注入。失败时另保存 `ui-failure.txt` 和可用的 iframe 截图。也可以使用 Anna dashboard 的 RPC 日志或 Record 功能观察真实链路。
+查看 `test-results/ui-rpc.jsonl` 中的 `scenario`、`ns` 和 `method`，可以对应到 storage.get/set、tools.invoke 及各测试场景。`storage-failure` 和 `safe-text` 场景通过模拟失败响应检查错误处理。失败时保存 `ui-failure.txt` 和可用的 iframe 截图。Anna 调试页面右侧的 RPC LOG 和 record 按钮也可用于查看和录制调用。
 
-测试范围包含空输入、稳定序号、并发写入队列、存储写失败后恢复、失败删除不改变已保存数据、损坏数据保护、summary 结果与错误透传。只验证本地单窗口模型，未实现跨窗口冲突合并。
+笔记逻辑测试覆盖空输入、添加顺序、写入队列、存储错误恢复、损坏数据处理和总结结果传递。
 
 ## 二进制打包
 
@@ -192,7 +181,7 @@ npm run package:executa -- --platform windows-x86_64
 node scripts/collect-release.mjs
 ```
 
-Go 的 amd64 对应 Anna 的 x86_64。支持的三个平台之外会明确报错。若 Go 未在 PATH，可以设置 GO_BINARY 为 go 可执行文件路径。
+Go 的 amd64 对应 Anna 的 x86_64。Go 未加入 PATH 时，可通过 `GO_BINARY` 指定可执行文件路径。
 
 ```text
 dist/
@@ -211,24 +200,24 @@ bin/notes-summary       # macOS：tar 内模式 0755
 # 或 bin/notes-summary.exe（Windows）
 ```
 
-根 manifest 包含 name/version/tools/host_capabilities/runtime.binary.entrypoint/permissions。验证脚本核对 SHA-256、二进制架构、archive 结构与 entrypoint；在相同平台解包，执行 describe，并对该解压文件运行完整双向协议测试，覆盖采样、并发、错误、超时、EOF 和 stdout 纯净性。证据独立保存在 `test-results/archive-<platform>/`，不会覆盖源码构建的测试记录。不同平台只检查结构与二进制头，不冒称完成了原生运行测试。
+验证脚本检查 SHA-256、manifest、入口路径、二进制架构及权限。在对应平台上还会解包并运行 describe 和完整协议测试，结果写入 `test-results/archive-<platform>/`；交叉编译产物执行结构与架构检查。
 
 ## GitHub Actions 发布
 
-日常 `.github/workflows/ci.yml` 在分支 push / PR 时调用 `verify.yml`，执行 `npm run check:all`。发布流程也先调用同一份可复用 workflow；验收失败就不会进入三平台构建。成功和失败的测试证据都会作为 Actions artifacts 保留。
+[Actions](https://github.com/Jandersway/mini-notes-anna/actions) · [Release 下载](https://github.com/Jandersway/mini-notes-anna/releases)
+
+日常 CI 在 push / PR 时执行 `npm run check:all`。发布流程先执行同一组检查，再构建三个平台的二进制包。测试日志和截图保存在 Actions artifacts 中。
 
 `.github/workflows/release.yml` 支持：
 
 - 推送版本 tag，例如 `v0.1.0`。
 - Actions → Build and release Executa → Run workflow，输入已存在的版本 tag。
 
-tag 必须匹配 package.json 与 Tool manifest 版本。手动触发同样 checkout 指定 tag，避免发布不同提交。
+发布前更新 package.json、Tool manifest 和 executa.json 中的版本号，提交后创建对应的 `v<版本号>` tag。手动触发时同样构建指定 tag 的代码。
 
-验收通过后，workflow 使用 macos-15（ARM64）、macos-15-intel（x86_64）、windows-2025（x86_64）分别执行检查、构建、打包，以及解包后完整协议验收。三个 job 全成功后，汇总 SHA256SUMS 并上传到同一个 GitHub Release；所有文件上传完毕才公开 Release。中间 Actions artifacts 只是传输介质，不是最终交付。
+工作流使用 macos-15（ARM64）、macos-15-intel（x86_64）、windows-2025（x86_64）分别构建、打包并运行解包后的协议测试。三个任务完成后，通过 Actions artifacts 汇总产物，上传三个压缩包和 SHA256SUMS.txt 到同一个 GitHub Release，上传完成后公开发布。
 
-发布资产必须包含三个平台 archive 和 SHA256SUMS.txt。使用内置 GITHUB_TOKEN，Release job 声明 contents: write，不需要在项目中配置个人 PAT。已公开的 Release 不被覆盖；发布新版本请更新版本号及 tag。
-
-当前 GitHub 远程仓库创建、推送、Actions 实际执行与 Release 发布状态见 `docs/evidence/verification.md`。本地交叉编译通过不等于 Actions 已运行。
+发布使用 `GITHUB_TOKEN` 的 `contents: write` 权限。已发布版本保持不变，后续发布使用新版本号。
 
 ## 项目结构
 
@@ -239,18 +228,16 @@ src/anna/storage.ts         Host API 笔记仓储
 src/anna/tools.ts           Executa 调用
 src/notes/model.ts          笔记数据校验与顺序
 executas/notes-summary/     Go 源码、嵌入 manifest、本地发现配置
-fixtures/                   host mock sampling fixture
+fixtures/                   sampling 测试响应
 scripts/                    构建、协议测试、CLI 测试、UI 测试、打包与校验
 tests/                      笔记与调用逻辑测试
-docs/evidence/              已执行验证的证据快照
+docs/                       截图与测试记录
 .github/workflows/          三平台 GitHub Release workflow
 bundle/                     前端构建产物（gitignore）
 dist/                       二进制 archive（gitignore）
 ```
 
-源码没有依赖隔壁的示例仓库、机器绝对路径、真实账号或秘密信息。首次 npm / uv 下载依赖需要网络，缓存完成后免登录的本地调试与 mock 测试不需要真实 LLM。
-
-## 官方资料
+## 参考资料
 
 - [本地开发](https://staging.anna.partners/developers/apps/local-dev.md)
 - [App UI SDK](https://staging.anna.partners/developers/apps/app-ui-sdk.md)
@@ -260,5 +247,3 @@ dist/                       二进制 archive（gitignore）
 - [Sampling](https://staging.anna.partners/developers/tools/executa-sampling.md)
 - [Binary Distribution](https://staging.anna.partners/developers/tools/executa-binary.md)
 - [参考示例](https://github.com/whtcjdtc2007/anna-executa-examples)
-
-普通文档页面由 JavaScript 渲染；在 URL 后加 `.md` 可获取官方原始 Markdown。此前浏览工具的连接失败已通过本机代理读取 Markdown 解决。
